@@ -78,12 +78,37 @@ export function FlashcardModeSelector() {
     return false;
   };
 
+  const handleBackToHome = () => {
+    setSelectedMode(null);
+    setSelectedSubjectId("");
+    setSelectedSubtopicId("");
+  };
+
+  // Show "Coming soon" for random mode
+  if (selectedMode === "random") {
+    return (
+      <div className="bg-white p-8 rounded-lg shadow-md text-center min-h-[400px] flex items-center justify-center">
+        <div>
+          <button
+            onClick={handleBackToHome}
+            className="mb-6 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 font-medium flex items-center gap-2 mx-auto"
+          >
+            <span>←</span>
+            <span>Return to Home</span>
+          </button>
+          <h2 className="text-3xl font-semibold text-gray-700">Coming soon...</h2>
+        </div>
+      </div>
+    );
+  }
+
   if (selectedMode && canStartStudy()) {
     return (
       <FlashcardStudy
         studyMode={selectedMode}
         subjectId={selectedMode === "subject" ? selectedSubjectId : undefined}
         subtopicId={selectedMode === "subtopic" ? selectedSubtopicId : undefined}
+        onBack={handleBackToHome}
       />
     );
   }

@@ -15,9 +15,10 @@ interface FlashcardStudyProps {
   studyMode: "subject" | "subtopic" | "random";
   subjectId?: string;
   subtopicId?: string;
+  onBack?: () => void;
 }
 
-export function FlashcardStudy({ studyMode, subjectId, subtopicId }: FlashcardStudyProps) {
+export function FlashcardStudy({ studyMode, subjectId, subtopicId, onBack }: FlashcardStudyProps) {
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -156,13 +157,34 @@ export function FlashcardStudy({ studyMode, subjectId, subtopicId }: FlashcardSt
   if (error) {
     return (
       <div className="bg-white p-8 rounded-lg shadow-md text-center">
+        {onBack && (
+          <div className="mb-4 text-left">
+            <button
+              onClick={onBack}
+              className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 font-medium flex items-center gap-2"
+            >
+              <span>←</span>
+              <span>Return to Home</span>
+            </button>
+          </div>
+        )}
         <p className="text-red-600 mb-4">{error}</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-        >
-          Retry
-        </button>
+        <div className="flex gap-4 justify-center">
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            Retry
+          </button>
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+            >
+              Return to Home
+            </button>
+          )}
+        </div>
       </div>
     );
   }
@@ -170,6 +192,17 @@ export function FlashcardStudy({ studyMode, subjectId, subtopicId }: FlashcardSt
   if (!sessionStarted) {
     return (
       <div className="bg-white p-8 rounded-lg shadow-md text-center">
+        {onBack && (
+          <div className="mb-4 text-left">
+            <button
+              onClick={onBack}
+              className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 font-medium flex items-center gap-2"
+            >
+              <span>←</span>
+              <span>Return to Home</span>
+            </button>
+          </div>
+        )}
         <h2 className="text-xl font-semibold mb-4">Ready to Study Flashcards?</h2>
         <p className="text-gray-600 mb-6">
           You'll be studying {sessionCards.length} flashcard{sessionCards.length !== 1 ? "s" : ""}.
@@ -189,16 +222,37 @@ export function FlashcardStudy({ studyMode, subjectId, subtopicId }: FlashcardSt
   if (sessionComplete) {
     return (
       <div className="bg-white p-8 rounded-lg shadow-md text-center">
+        {onBack && (
+          <div className="mb-4 text-left">
+            <button
+              onClick={onBack}
+              className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 font-medium flex items-center gap-2"
+            >
+              <span>←</span>
+              <span>Return to Home</span>
+            </button>
+          </div>
+        )}
         <h2 className="text-2xl font-semibold mb-4 text-green-600">🎉 Session Complete!</h2>
         <p className="text-gray-600 mb-6">
           You've correctly answered all {flashcards.length} flashcard{flashcards.length !== 1 ? "s" : ""}!
         </p>
-        <button
-          onClick={handleRestart}
-          className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-lg font-medium"
-        >
-          Study Again
-        </button>
+        <div className="flex gap-4 justify-center">
+          <button
+            onClick={handleRestart}
+            className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-lg font-medium"
+          >
+            Study Again
+          </button>
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="px-6 py-3 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-lg font-medium"
+            >
+              Return to Home
+            </button>
+          )}
+        </div>
       </div>
     );
   }
@@ -208,6 +262,19 @@ export function FlashcardStudy({ studyMode, subjectId, subtopicId }: FlashcardSt
 
   return (
     <div className="bg-white p-8 rounded-lg shadow-md">
+      {/* Return to Home button */}
+      {onBack && (
+        <div className="mb-4">
+          <button
+            onClick={onBack}
+            className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 font-medium flex items-center gap-2"
+          >
+            <span>←</span>
+            <span>Return to Home</span>
+          </button>
+        </div>
+      )}
+      
       {/* Progress bar */}
       <div className="mb-6">
         <div className="flex justify-between text-sm text-gray-600 mb-2">

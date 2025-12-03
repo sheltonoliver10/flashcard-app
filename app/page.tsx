@@ -48,8 +48,35 @@ export default function Home() {
   }, []);
 
   const handleLogout = async () => {
-    const supabase = createSupabaseBrowserClient();
-    await supabase.auth.signOut();
+    try {
+      // First, try to sign out via the browser client
+      const supabase = createSupabaseBrowserClient();
+      await supabase.auth.signOut();
+      
+      // Also call the server-side logout route to ensure cookies are cleared
+      try {
+        await fetch("/auth/logout", {
+          method: "POST",
+          credentials: "include",
+        });
+      } catch (serverError) {
+        console.error("Server logout error:", serverError);
+        // Continue anyway - browser signOut should work
+      }
+      
+      // Clear any local storage/session storage
+      if (typeof window !== "undefined") {
+        localStorage.clear();
+        sessionStorage.clear();
+      }
+      
+      // Force a hard reload to ensure clean state
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Failed to logout:", error);
+      // Force redirect even on error
+      window.location.href = "/";
+    }
   };
 
   if (loading) {

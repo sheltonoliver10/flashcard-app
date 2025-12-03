@@ -5,6 +5,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
 
 export function Auth() {
   const [isSignUp, setIsSignUp] = useState(false);
+  const [isResetPassword, setIsResetPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -23,7 +24,20 @@ export function Auth() {
 
       const supabase = createSupabaseBrowserClient();
 
-      if (isSignUp) {
+      if (isResetPassword) {
+        // Send password reset email
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/auth/reset-password`,
+        });
+
+        if (error) throw error;
+        setMessage({
+          type: "success",
+          text: "Password reset email sent! Please check your email for the reset link.",
+        });
+        setEmail("");
+        setIsResetPassword(false);
+      } else if (isSignUp) {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -74,7 +88,11 @@ export function Auth() {
       <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8">
         <h1 className="text-3xl font-bold text-center mb-2">Bar Exam Flash Card Study</h1>
         <p className="text-gray-600 text-center mb-6">
-          {isSignUp ? "Create an account to get started" : "Sign in to continue"}
+          {isResetPassword
+            ? "Enter your email to reset your password"
+            : isSignUp
+            ? "Create an account to get started"
+            : "Sign in to continue"}
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -93,24 +111,26 @@ export function Auth() {
             />
           </div>
 
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="••••••••"
-            />
-            {isSignUp && (
-              <p className="text-xs text-gray-500 mt-1">Password must be at least 6 characters</p>
-            )}
-          </div>
+          {!isResetPassword && (
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="••••••••"
+              />
+              {isSignUp && (
+                <p className="text-xs text-gray-500 mt-1">Password must be at least 6 characters</p>
+              )}
+            </div>
+          )}
 
           {message && (
             <div
@@ -129,25 +149,59 @@ export function Auth() {
             disabled={loading}
             className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
           >
-            {loading ? "Loading..." : isSignUp ? "Sign Up" : "Sign In"}
+            {loading
+              ? "Loading..."
+              : isResetPassword
+              ? "Send Reset Link"
+              : isSignUp
+              ? "Sign Up"
+              : "Sign In"}
           </button>
         </form>
 
-        <div className="mt-6 text-center">
-          <button
-            type="button"
-            onClick={() => {
-              setIsSignUp(!isSignUp);
-              setMessage(null);
-              setEmail("");
-              setPassword("");
-            }}
-            className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-          >
-            {isSignUp
-              ? "Already have an account? Sign in"
-              : "Don't have an account? Sign up"}
-          </button>
+        <div className="mt-6 space-y-2 text-center">
+          {!isResetPassword && (
+            <button
+              type="button"
+              onClick={() => {
+                setIsResetPassword(true);
+                setMessage(null);
+                setPassword("");
+              }}
+              className="block w-full text-blue-600 hover:text-blue-700 text-sm font-medium"
+            >
+              Forgot your password?
+            </button>
+          )}
+          {isResetPassword && (
+            <button
+              type="button"
+              onClick={() => {
+                setIsResetPassword(false);
+                setMessage(null);
+                setEmail("");
+              }}
+              className="block w-full text-blue-600 hover:text-blue-700 text-sm font-medium"
+            >
+              Back to sign in
+            </button>
+          )}
+          {!isResetPassword && (
+            <button
+              type="button"
+              onClick={() => {
+                setIsSignUp(!isSignUp);
+                setMessage(null);
+                setEmail("");
+                setPassword("");
+              }}
+              className="block w-full text-blue-600 hover:text-blue-700 text-sm font-medium"
+            >
+              {isSignUp
+                ? "Already have an account? Sign in"
+                : "Don't have an account? Sign up"}
+            </button>
+          )}
         </div>
       </div>
     </div>
