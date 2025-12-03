@@ -24,34 +24,57 @@ export default function Home() {
       supabase.auth.getSession().then(({ data: { session }, error }) => {
         if (error) {
           console.error("Session error:", error);
+          // If there's an error, clear any invalid session
+          supabase.auth.signOut();
+          setUser(null);
+          setLoading(false);
+          return;
         }
-        setUser(session?.user ?? null);
+        
+        // Validate session exists and has a user
+        if (session?.user) {
+          setUser(session.user);
+        } else {
+          // No valid session, ensure we're signed out
+          setUser(null);
+        }
         setLoading(false);
       }).catch((err) => {
         console.error("Failed to get session:", err);
+        setUser(null);
         setLoading(false);
       });
 
       // Listen for auth changes
       const {
         data: { subscription },
-      } = supabase.auth.onAuthStateChange((_event, session) => {
-        setUser(session?.user ?? null);
+      } = supabase.auth.onAuthStateChange((event, session) => {
+        // Handle sign out events
+        if (event === 'SIGNED_OUT' || !session) {
+          setUser(null);
+        } else if (session?.user) {
+          setUser(session.user);
+        }
         setLoading(false);
       });
 
       return () => subscription.unsubscribe();
     } catch (error) {
       console.error("Failed to initialize Supabase:", error);
+      setUser(null);
       setLoading(false);
     }
   }, []);
 
   const handleLogout = async () => {
     try {
-      // First, try to sign out via the browser client
       const supabase = createSupabaseBrowserClient();
-      await supabase.auth.signOut();
+      
+      // Sign out from Supabase
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (signOutError) {
+        console.error("Sign out error:", signOutError);
+      }
       
       // Also call the server-side logout route to ensure cookies are cleared
       try {
@@ -61,20 +84,34 @@ export default function Home() {
         });
       } catch (serverError) {
         console.error("Server logout error:", serverError);
-        // Continue anyway - browser signOut should work
       }
       
       // Clear any local storage/session storage
       if (typeof window !== "undefined") {
-        localStorage.clear();
-        sessionStorage.clear();
+        // Only clear Supabase-related items, not everything
+        Object.keys(localStorage).forEach(key => {
+          if (key.includes('supabase') || key.includes('sb-')) {
+            localStorage.removeItem(key);
+          }
+        });
+        Object.keys(sessionStorage).forEach(key => {
+          if (key.includes('supabase') || key.includes('sb-')) {
+            sessionStorage.removeItem(key);
+          }
+        });
       }
       
+      // Clear user state immediately
+      setUser(null);
+      
       // Force a hard reload to ensure clean state
-      window.location.href = "/";
+      setTimeout(() => {
+        window.location.href = "/";
+      }, 100);
     } catch (error) {
       console.error("Failed to logout:", error);
-      // Force redirect even on error
+      // Clear user state and redirect even on error
+      setUser(null);
       window.location.href = "/";
     }
   };

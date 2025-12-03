@@ -102,12 +102,22 @@ export function FlashcardModeSelector() {
     );
   }
 
-  if (selectedMode && canStartStudy()) {
+  // Show study component for subject or subtopic modes
+  if (selectedMode === "subject" && canStartStudy()) {
     return (
       <FlashcardStudy
-        studyMode={selectedMode}
-        subjectId={selectedMode === "subject" ? selectedSubjectId : undefined}
-        subtopicId={selectedMode === "subtopic" ? selectedSubtopicId : undefined}
+        studyMode="subject"
+        subjectId={selectedSubjectId}
+        onBack={handleBackToHome}
+      />
+    );
+  }
+
+  if (selectedMode === "subtopic" && canStartStudy()) {
+    return (
+      <FlashcardStudy
+        studyMode="subtopic"
+        subtopicId={selectedSubtopicId}
         onBack={handleBackToHome}
       />
     );
@@ -158,7 +168,7 @@ export function FlashcardModeSelector() {
               type="radio"
               name="studyMode"
               value="random"
-              checked={selectedMode === "random"}
+              checked={(selectedMode as "subject" | "subtopic" | "random" | null) === "random"}
               onChange={() => handleModeSelect("random")}
               className="mr-3"
             />
