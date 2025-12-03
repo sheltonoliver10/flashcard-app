@@ -168,7 +168,7 @@ export function FlashcardModeSelector() {
               type="radio"
               name="studyMode"
               value="random"
-              checked={(selectedMode as "subject" | "subtopic" | "random" | null) === "random"}
+              checked={selectedMode !== null && selectedMode === "random"}
               onChange={() => handleModeSelect("random")}
               className="mr-3"
             />
