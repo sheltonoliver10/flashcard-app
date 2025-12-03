@@ -123,6 +123,9 @@ export function FlashcardModeSelector() {
     );
   }
 
+  // Helper to check if random mode is selected (avoids TypeScript narrowing issue)
+  const isRandomMode = selectedMode === ("random" as typeof selectedMode);
+
   return (
     <div className="bg-white p-8 rounded-lg shadow-md">
       <h2 className="text-xl font-semibold mb-6">Choose Your Study Mode</h2>
@@ -168,7 +171,7 @@ export function FlashcardModeSelector() {
               type="radio"
               name="studyMode"
               value="random"
-              checked={selectedMode !== null && selectedMode === "random"}
+              checked={isRandomMode}
               onChange={() => handleModeSelect("random")}
               className="mr-3"
             />
