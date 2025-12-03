@@ -19,6 +19,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { UserList } from "./UserList";
 
 interface Subject {
   id: string;
@@ -253,7 +254,7 @@ export function FlashcardManagement() {
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"subjects" | "subtopics" | "flashcards">("subjects");
+  const [activeTab, setActiveTab] = useState<"subjects" | "subtopics" | "flashcards" | "users">("subjects");
   const [expandedSubtopics, setExpandedSubtopics] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState<string>("");
   
@@ -1030,6 +1031,16 @@ export function FlashcardManagement() {
         >
           Flashcards
         </button>
+        <button
+          onClick={() => setActiveTab("users")}
+          className={`px-4 py-2 font-medium ${
+            activeTab === "users"
+              ? "border-b-2 border-blue-600 text-blue-600"
+              : "text-gray-600 hover:text-gray-800"
+          }`}
+        >
+          Users
+        </button>
       </div>
 
       {/* Subjects Tab */}
@@ -1528,6 +1539,13 @@ export function FlashcardManagement() {
               })()
             )}
           </div>
+        </div>
+      )}
+
+      {/* Users Tab */}
+      {activeTab === "users" && (
+        <div>
+          <UserList />
         </div>
       )}
     </div>

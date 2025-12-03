@@ -16,10 +16,15 @@ export function Auth() {
     setMessage(null);
 
     try {
+      // Check if environment variables are set
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        throw new Error("Supabase configuration is missing. Please check your environment variables.");
+      }
+
       const supabase = createSupabaseBrowserClient();
 
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
         });
@@ -32,18 +37,32 @@ export function Auth() {
         setEmail("");
         setPassword("");
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
 
-        if (error) throw error;
-        // Success - the page will automatically reload and show the app
+        if (error) {
+          console.error("Sign in error details:", {
+            message: error.message,
+            status: error.status,
+            name: error.name,
+          });
+          throw error;
+        }
+        
+        if (data?.session) {
+          // Success - the page will automatically reload and show the app
+          window.location.reload();
+        } else {
+          throw new Error("Sign in successful but no session was created. Please try again.");
+        }
       }
     } catch (error: any) {
+      console.error("Auth error:", error);
       setMessage({
         type: "error",
-        text: error.message || "An error occurred. Please try again.",
+        text: error.message || error.toString() || "An error occurred. Please try again.",
       });
     } finally {
       setLoading(false);
