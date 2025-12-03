@@ -11,17 +11,35 @@ export default function Home() {
   const [mode, setMode] = useState<"study" | "manage">("study");
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   
   // Check if user is admin
   const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "";
   const isAdmin = user?.email?.toLowerCase() === adminEmail.toLowerCase();
 
   useEffect(() => {
+    // Check if we're in the middle of logging out (check sessionStorage flag)
+    const wasLoggingOut = sessionStorage.getItem('_logout_in_progress') === 'true';
+    if (wasLoggingOut) {
+      sessionStorage.removeItem('_logout_in_progress');
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+
     try {
       const supabase = createSupabaseBrowserClient();
 
       // Check current session
       supabase.auth.getSession().then(({ data: { session }, error }) => {
+        // Don't restore session if we're logging out
+        if (isLoggingOut) {
+          console.log("Logging out, skipping session restore");
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+
         if (error) {
           console.error("Session error:", error);
           // If there's an error, clear any invalid session
@@ -49,13 +67,33 @@ export default function Home() {
       const {
         data: { subscription },
       } = supabase.auth.onAuthStateChange((event, session) => {
-        // Handle sign out events
-        if (event === 'SIGNED_OUT' || !session) {
-          setUser(null);
-        } else if (session?.user) {
-          setUser(session.user);
+        // Don't restore session if we're in the process of logging out
+        if (isLoggingOut) {
+          console.log("Logging out, ignoring auth state change");
+          return;
         }
-        setLoading(false);
+        
+        console.log("Auth state changed:", event, session?.user?.email || "no user");
+        // Handle sign out events - be very explicit
+        if (event === 'SIGNED_OUT') {
+          console.log("SIGNED_OUT event detected, clearing user");
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+        if (!session || !session.user) {
+          console.log("No session found, clearing user");
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+        if (session?.user) {
+          console.log("Session found, setting user:", session.user.email);
+          setUser(session.user);
+          setLoading(false);
+        } else {
+          setLoading(false);
+        }
       });
 
       return () => subscription.unsubscribe();
@@ -67,52 +105,54 @@ export default function Home() {
   }, []);
 
   const handleLogout = async () => {
+    console.log("Logout initiated");
+    setIsLoggingOut(true); // Prevent auth state listener from restoring session
+    setUser(null); // Clear user state immediately
+    
     try {
       const supabase = createSupabaseBrowserClient();
       
-      // Sign out from Supabase
+      // Set a flag in sessionStorage to prevent session restore on reload
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem('_logout_in_progress', 'true');
+      }
+      
+      // Sign out from Supabase FIRST
+      console.log("Calling supabase.auth.signOut()");
       const { error: signOutError } = await supabase.auth.signOut();
+      
       if (signOutError) {
         console.error("Sign out error:", signOutError);
+      } else {
+        console.log("Sign out successful");
       }
       
-      // Also call the server-side logout route to ensure cookies are cleared
-      try {
-        await fetch("/auth/logout", {
-          method: "POST",
-          credentials: "include",
-        });
-      } catch (serverError) {
-        console.error("Server logout error:", serverError);
-      }
-      
-      // Clear any local storage/session storage
+      // Clear all storage AFTER signOut
       if (typeof window !== "undefined") {
-        // Only clear Supabase-related items, not everything
-        Object.keys(localStorage).forEach(key => {
-          if (key.includes('supabase') || key.includes('sb-')) {
-            localStorage.removeItem(key);
-          }
-        });
-        Object.keys(sessionStorage).forEach(key => {
-          if (key.includes('supabase') || key.includes('sb-')) {
-            sessionStorage.removeItem(key);
-          }
-        });
+        console.log("Clearing storage...");
+        // Clear ALL localStorage (Supabase stores session here)
+        localStorage.clear();
+        // Keep the logout flag in sessionStorage temporarily
+        sessionStorage.clear();
+        sessionStorage.setItem('_logout_in_progress', 'true');
+        console.log("Storage cleared");
       }
       
-      // Clear user state immediately
-      setUser(null);
+      // Wait a moment to ensure signOut completes and cookies are cleared
+      await new Promise(resolve => setTimeout(resolve, 200));
       
-      // Force a hard reload to ensure clean state
-      setTimeout(() => {
-        window.location.href = "/";
-      }, 100);
+      console.log("Redirecting to home page...");
+      // Force immediate hard redirect - use replace to prevent back button
+      window.location.replace("/");
     } catch (error) {
       console.error("Failed to logout:", error);
       // Clear user state and redirect even on error
       setUser(null);
-      window.location.href = "/";
+      if (typeof window !== "undefined") {
+        localStorage.clear();
+        sessionStorage.setItem('_logout_in_progress', 'true');
+      }
+      window.location.replace("/");
     }
   };
 
