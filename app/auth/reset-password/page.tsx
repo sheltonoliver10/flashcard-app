@@ -14,19 +14,93 @@ function ResetPasswordContent() {
   const [isValidToken, setIsValidToken] = useState(false);
 
   useEffect(() => {
-    // Check if we have a valid reset token in the URL
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const accessToken = hashParams.get("access_token");
-    const type = hashParams.get("type");
+    const checkResetToken = async () => {
+      const supabase = createSupabaseBrowserClient();
+      
+      // Check if we have a reset token in the URL hash
+      const hash = window.location.hash;
+      console.log("URL hash:", hash ? hash.substring(0, 50) + "..." : "no hash");
+      
+      const hashParams = new URLSearchParams(hash.substring(1));
+      const accessToken = hashParams.get("access_token");
+      const type = hashParams.get("type");
 
-    if (accessToken && type === "recovery") {
-      setIsValidToken(true);
-    } else {
-      setMessage({
-        type: "error",
-        text: "Invalid or expired reset link. Please request a new password reset.",
-      });
-    }
+      console.log("Token check:", { accessToken: !!accessToken, type });
+
+      const hasTokenInUrl = accessToken && type === "recovery";
+      
+      if (hasTokenInUrl) {
+        console.log("Reset token found in URL hash, processing...");
+        
+        // Supabase SSR should automatically process the hash token when getSession() is called
+        // Listen for auth state changes to detect when token is processed
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+          console.log("Auth state changed on reset page:", event, session?.user?.email || "no user");
+          
+          if (event === 'PASSWORD_RECOVERY' || (session && session.user)) {
+            console.log("Password recovery token processed successfully");
+            setIsValidToken(true);
+            subscription.unsubscribe();
+          }
+        });
+
+        // Check session multiple times with increasing delays
+        const checkSession = async (attempt: number) => {
+          const { data: { session }, error } = await supabase.auth.getSession();
+          console.log(`Session check attempt ${attempt}:`, session?.user?.email || "no session", error?.message || "no error");
+          
+          if (session && session.user && !error) {
+            console.log("Session found, token is valid");
+            setIsValidToken(true);
+            subscription.unsubscribe();
+            return true;
+          }
+          return false;
+        };
+
+        // Check immediately
+        const immediateCheck = await checkSession(1);
+        
+        if (!immediateCheck) {
+          // Check after 1 second
+          setTimeout(async () => {
+            const delayedCheck = await checkSession(2);
+            if (!delayedCheck) {
+              // Check after 3 more seconds
+              setTimeout(async () => {
+                const finalCheck = await checkSession(3);
+                if (!finalCheck) {
+                  console.log("Token processing failed after all attempts");
+                  setMessage({
+                    type: "error",
+                    text: "Invalid or expired reset link. Please request a new password reset.",
+                  });
+                }
+                subscription.unsubscribe();
+              }, 3000);
+            } else {
+              subscription.unsubscribe();
+            }
+          }, 1000);
+        } else {
+          subscription.unsubscribe();
+        }
+      } else {
+        // No token in URL - check if there's already a valid session
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session) {
+          setIsValidToken(true);
+        } else {
+          setMessage({
+            type: "error",
+            text: "Invalid or expired reset link. Please request a new password reset.",
+          });
+        }
+      }
+    };
+
+    checkResetToken();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
