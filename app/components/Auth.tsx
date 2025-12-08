@@ -26,7 +26,6 @@ export function Auth() {
 
       if (isResetPassword) {
         // Send password reset email
-        // Use callback route to handle Supabase verify redirect properly
         // Ensure we use www version to match domain configuration
         let origin = window.location.origin;
         // Convert non-www to www if needed
@@ -34,7 +33,7 @@ export function Auth() {
           origin = origin.replace('barexamnotecards.com', 'www.barexamnotecards.com');
         }
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${origin}/auth/callback`,
+          redirectTo: `${origin}/auth/reset-password`,
         });
 
         if (error) throw error;

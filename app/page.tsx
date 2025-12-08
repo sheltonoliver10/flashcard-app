@@ -18,6 +18,20 @@ export default function Home() {
   const isAdmin = user?.email?.toLowerCase() === adminEmail.toLowerCase();
 
   useEffect(() => {
+    // Check for password reset token in URL hash (in case Supabase redirects to root)
+    const hash = window.location.hash;
+    if (hash) {
+      const hashParams = new URLSearchParams(hash.substring(1));
+      const accessToken = hashParams.get('access_token');
+      const type = hashParams.get('type');
+      
+      if (type === 'recovery' && accessToken) {
+        // Redirect to reset password page with token
+        window.location.href = `/auth/reset-password${hash}`;
+        return;
+      }
+    }
+
     // Check if we're in the middle of logging out (check sessionStorage flag)
     const wasLoggingOut = sessionStorage.getItem('_logout_in_progress') === 'true';
     if (wasLoggingOut) {
