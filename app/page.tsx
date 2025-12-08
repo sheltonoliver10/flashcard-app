@@ -175,33 +175,37 @@ export default function Home() {
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold">
-              {mode === "study" ? "Bar Exam Flash Card Study" : "Flashcard Management"}
+            <h1 className="text-3xl font-bold text-gray-900">
+              {mode === "study" ? "Bar Exam Notecards Study" : "Flashcard Management"}
             </h1>
-            <p className="text-sm text-gray-600 mt-1">Signed in as {user.email}</p>
+            {isAdmin && (
+              <p className="text-sm text-gray-600 mt-1">Signed in as {user.email}</p>
+            )}
           </div>
           <div className="flex gap-2 items-center">
-            <button
-              onClick={() => setMode("study")}
-              className={`px-4 py-2 rounded-md font-medium ${
-                mode === "study"
-                  ? "bg-blue-600 text-white"
-                  : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
-              }`}
-            >
-              Study Mode
-            </button>
             {isAdmin && (
-              <button
-                onClick={() => setMode("manage")}
-                className={`px-4 py-2 rounded-md font-medium ${
-                  mode === "manage"
-                    ? "bg-blue-600 text-white"
-                    : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
-                }`}
-              >
-                Management Mode
-              </button>
+              <>
+                <button
+                  onClick={() => setMode("study")}
+                  className={`px-4 py-2 rounded-md font-medium ${
+                    mode === "study"
+                      ? "bg-blue-600 text-white"
+                      : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  Study Mode
+                </button>
+                <button
+                  onClick={() => setMode("manage")}
+                  className={`px-4 py-2 rounded-md font-medium ${
+                    mode === "manage"
+                      ? "bg-blue-600 text-white"
+                      : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  Management Mode
+                </button>
+              </>
             )}
             <button
               onClick={handleLogout}

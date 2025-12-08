@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Bar Exam Flash Card Study",
+  title: "Bar Exam Notecards Study",
   description: "Study flashcards by subject, subtopic, or random mix",
 };
 

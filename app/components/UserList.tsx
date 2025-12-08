@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
 
 interface User {
+  id: string;
   email: string;
   created_at: string;
   email_verified: boolean;
@@ -13,6 +14,7 @@ export function UserList() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -62,6 +64,43 @@ export function UserList() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const handleDeleteUser = async (userEmail: string, userId: string) => {
+    // Prevent deleting admin user
+    const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "";
+    if (userEmail.toLowerCase() === adminEmail.toLowerCase()) {
+      alert("Cannot delete the admin user.");
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to delete user "${userEmail}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      setDeletingUserId(userId);
+      setError(null);
+      const supabase = createSupabaseBrowserClient();
+      
+      const { data, error: deleteError } = await supabase.rpc('delete_user_by_email', {
+        user_email: userEmail
+      });
+      
+      if (deleteError) throw deleteError;
+      
+      if (data === false) {
+        throw new Error('User not found');
+      }
+      
+      // Remove user from local state
+      setUsers(users.filter(u => u.id !== userId));
+    } catch (err: any) {
+      console.error("Error deleting user:", err);
+      setError(err.message || "Failed to delete user");
+    } finally {
+      setDeletingUserId(null);
+    }
   };
 
   if (loading) {
@@ -132,12 +171,13 @@ export function UserList() {
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Email</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Signup Date</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Verified</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-700">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {users.map((user, index) => (
+              {users.map((user) => (
                 <tr
-                  key={index}
+                  key={user.id}
                   className="border-b border-gray-100 hover:bg-gray-50"
                 >
                   <td className="py-3 px-4 text-gray-900">{user.email}</td>
@@ -160,6 +200,33 @@ export function UserList() {
                     >
                       {user.email_verified ? 'Yes' : 'Pending'}
                     </span>
+                  </td>
+                  <td className="py-3 px-4">
+                    {(() => {
+                      const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "";
+                      const isAdmin = user.email.toLowerCase() === adminEmail.toLowerCase();
+                      const isDeleting = deletingUserId === user.id;
+                      
+                      if (isAdmin) {
+                        return (
+                          <span className="text-xs text-gray-500 italic">Admin (cannot delete)</span>
+                        );
+                      }
+                      
+                      return (
+                        <button
+                          onClick={() => handleDeleteUser(user.email, user.id)}
+                          disabled={isDeleting}
+                          className={`px-3 py-1 rounded text-sm font-medium ${
+                            isDeleting
+                              ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                              : 'bg-red-500 text-white hover:bg-red-600'
+                          }`}
+                        >
+                          {isDeleting ? 'Deleting...' : 'Delete'}
+                        </button>
+                      );
+                    })()}
                   </td>
                 </tr>
               ))}

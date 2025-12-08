@@ -128,7 +128,7 @@ export function FlashcardModeSelector() {
 
   return (
     <div className="bg-white p-8 rounded-lg shadow-md">
-      <h2 className="text-xl font-semibold mb-6">Choose Your Study Mode</h2>
+      <h2 className="text-xl font-semibold mb-6 text-gray-900">Choose Your Study Mode</h2>
 
       {/* Mode Selection */}
       <div className="mb-6">
@@ -146,8 +146,8 @@ export function FlashcardModeSelector() {
               className="mr-3"
             />
             <div>
-              <div className="font-medium">By Subject</div>
-              <div className="text-sm text-gray-500">Study all flashcards for a specific subject</div>
+              <div className="font-medium text-gray-900">By Subject</div>
+              <div className="text-sm text-gray-900">Study all flashcards for a specific subject</div>
             </div>
           </label>
 
@@ -161,8 +161,8 @@ export function FlashcardModeSelector() {
               className="mr-3"
             />
             <div>
-              <div className="font-medium">By Subtopic</div>
-              <div className="text-sm text-gray-500">Study flashcards for a specific subtopic</div>
+              <div className="font-medium text-gray-900">By Subtopic</div>
+              <div className="text-sm text-gray-900">Study flashcards for a specific subtopic</div>
             </div>
           </label>
 
@@ -176,8 +176,8 @@ export function FlashcardModeSelector() {
               className="mr-3"
             />
             <div>
-              <div className="font-medium">Random Mix</div>
-              <div className="text-sm text-gray-500">Study 25 random flashcards from all topics</div>
+              <div className="font-medium text-gray-900">Random Mix</div>
+              <div className="text-sm text-gray-900">Study 25 random flashcards from all topics</div>
             </div>
           </label>
         </div>
@@ -234,7 +234,7 @@ export function FlashcardModeSelector() {
                 Select Subtopic
               </label>
               {loading ? (
-                <p className="text-gray-500">Loading subtopics...</p>
+                <p className="text-gray-900">Loading subtopics...</p>
               ) : (
                 <select
                   value={selectedSubtopicId}

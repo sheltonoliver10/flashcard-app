@@ -220,8 +220,8 @@ export function FlashcardStudy({ studyMode, subjectId, subtopicId, onBack }: Fla
             </button>
           </div>
         )}
-        <h2 className="text-xl font-semibold mb-4">Ready to Study Flashcards?</h2>
-        <p className="text-gray-600 mb-6">
+        <h2 className="text-xl font-semibold mb-4 text-gray-900">Ready to Study Flashcards?</h2>
+        <p className="text-gray-900 mb-6">
           You'll be studying {sessionCards.length} flashcard{sessionCards.length !== 1 ? "s" : ""}.
           <br />
           Mark cards as correct or incorrect. Cards you get wrong will be shown again.
@@ -330,14 +330,14 @@ export function FlashcardStudy({ studyMode, subjectId, subtopicId, onBack }: Fla
       {currentCard && (
         <div className="mb-6">
           <div
-            className="min-h-[300px] flex items-center justify-center p-8 border-2 border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 transition-all bg-white"
+            className="min-h-[200px] md:min-h-[300px] flex items-center justify-center p-4 md:p-8 border-2 border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 transition-all bg-white"
             onClick={handleFlip}
           >
             <div className="text-center w-full">
               <p className="text-sm text-gray-500 mb-2">
                 {isFlipped ? "Back" : "Front"}
               </p>
-              <p className="text-xl font-medium text-gray-800 whitespace-pre-wrap break-words">
+              <p className="text-base md:text-xl font-medium text-gray-800 whitespace-pre-wrap break-words">
                 {isFlipped ? currentCard.back_text : currentCard.front_text}
               </p>
               <p className="text-xs text-gray-400 mt-4">Click to flip</p>
