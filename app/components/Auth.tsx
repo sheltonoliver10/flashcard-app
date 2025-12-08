@@ -26,14 +26,8 @@ export function Auth() {
 
       if (isResetPassword) {
         // Send password reset email
-        // Ensure we use www version to match domain configuration
-        let origin = window.location.origin;
-        // Convert non-www to www if needed
-        if (origin.includes('barexamnotecards.com') && !origin.includes('www.')) {
-          origin = origin.replace('barexamnotecards.com', 'www.barexamnotecards.com');
-        }
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${origin}/auth/reset-password`,
+          redirectTo: "https://www.barexamnotecards.com/auth/reset-password",
         });
 
         if (error) throw error;
