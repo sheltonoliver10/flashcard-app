@@ -24,6 +24,8 @@ export function FlashcardStudy({ studyMode, subjectId, subtopicId, onBack }: Fla
   const [isFlipped, setIsFlipped] = useState(false);
   const [correctCards, setCorrectCards] = useState<Set<string>>(new Set());
   const [wrongCards, setWrongCards] = useState<Set<string>>(new Set());
+  const [originalWrongCards, setOriginalWrongCards] = useState<Set<string>>(new Set());
+  const [isReviewMode, setIsReviewMode] = useState(false);
   const [sessionCards, setSessionCards] = useState<Flashcard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -86,6 +88,8 @@ export function FlashcardStudy({ studyMode, subjectId, subtopicId, onBack }: Fla
 
   const handleStart = () => {
     setSessionStarted(true);
+    setIsReviewMode(false);
+    setOriginalWrongCards(new Set());
   };
 
   const handleCorrect = () => {
@@ -117,14 +121,14 @@ export function FlashcardStudy({ studyMode, subjectId, subtopicId, onBack }: Fla
     
     // Check if we've gone through all cards
     if (currentIndex >= sessionCards.length - 1) {
-      // If there are wrong cards, restart with only wrong cards
-      if (wrongCards.size > 0) {
-        const wrongCardsArray = sessionCards.filter((card) => wrongCards.has(card.id));
-        setSessionCards(wrongCardsArray);
-        setCurrentIndex(0);
-        setCorrectCards(new Set()); // Reset correct cards for the retry round
+      // If this is the first pass (not review mode), save wrong cards and show completion screen
+      if (!isReviewMode) {
+        setOriginalWrongCards(new Set(wrongCards));
+        setSessionComplete(true);
       } else {
-        // All cards are correct!
+        // In review mode, always show completion screen with current session results
+        // Update originalWrongCards to reflect the current wrong cards from this review session
+        setOriginalWrongCards(new Set(wrongCards));
         setSessionComplete(true);
       }
     } else {
@@ -142,7 +146,20 @@ export function FlashcardStudy({ studyMode, subjectId, subtopicId, onBack }: Fla
     setIsFlipped(false);
     setCorrectCards(new Set());
     setWrongCards(new Set());
+    setOriginalWrongCards(new Set());
+    setIsReviewMode(false);
     setSessionCards(flashcards);
+    setSessionComplete(false);
+  };
+
+  const handleReviewMissedCards = () => {
+    const missedCardsArray = flashcards.filter((card) => originalWrongCards.has(card.id));
+    setSessionCards(missedCardsArray);
+    setCurrentIndex(0);
+    setIsFlipped(false);
+    setCorrectCards(new Set());
+    setWrongCards(new Set());
+    setIsReviewMode(true);
     setSessionComplete(false);
   };
 
@@ -220,6 +237,13 @@ export function FlashcardStudy({ studyMode, subjectId, subtopicId, onBack }: Fla
   }
 
   if (sessionComplete) {
+    // Calculate score based on current session
+    // When in review mode, sessionCards contains the cards from the review session
+    // When not in review mode, we need to use the original flashcards length
+    const totalCardsInSession = isReviewMode ? sessionCards.length : flashcards.length;
+    const correctInSession = totalCardsInSession - originalWrongCards.size;
+    const perfectScore = originalWrongCards.size === 0;
+
     return (
       <div className="bg-white p-8 rounded-lg shadow-md text-center">
         {onBack && (
@@ -233,21 +257,34 @@ export function FlashcardStudy({ studyMode, subjectId, subtopicId, onBack }: Fla
             </button>
           </div>
         )}
-        <h2 className="text-2xl font-semibold mb-4 text-green-600">🎉 Session Complete!</h2>
-        <p className="text-gray-600 mb-6">
-          You've correctly answered all {flashcards.length} flashcard{flashcards.length !== 1 ? "s" : ""}!
+        <h2 className="text-2xl font-semibold mb-4 text-purple-600">🎉 Session Complete!</h2>
+        <p className="text-gray-700 mb-2 text-lg">
+          You got {correctInSession} out of {totalCardsInSession} cards correct!
         </p>
-        <div className="flex gap-4 justify-center">
+        {perfectScore ? (
+          <p className="text-green-600 mb-6 font-medium">Perfect score!</p>
+        ) : (
+          <p className="text-orange-600 mb-6 font-medium">Keep practicing!</p>
+        )}
+        <div className="flex flex-col gap-4 justify-center items-center">
+          {!perfectScore && (
+            <button
+              onClick={handleReviewMissedCards}
+              className="px-6 py-3 bg-orange-500 text-white rounded-md hover:bg-orange-600 text-lg font-medium w-full max-w-xs"
+            >
+              Review Missed Cards ({originalWrongCards.size})
+            </button>
+          )}
           <button
             onClick={handleRestart}
-            className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-lg font-medium"
+            className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-lg font-medium w-full max-w-xs"
           >
             Study Again
           </button>
           {onBack && (
             <button
               onClick={onBack}
-              className="px-6 py-3 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-lg font-medium"
+              className="px-6 py-3 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-lg font-medium w-full max-w-xs"
             >
               Return to Home
             </button>
