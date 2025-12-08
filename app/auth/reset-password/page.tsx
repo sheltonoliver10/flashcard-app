@@ -17,13 +17,23 @@ function ResetPasswordContent() {
     const checkResetToken = async () => {
       const supabase = createSupabaseBrowserClient();
       
-      // Check if we have a reset token in the URL hash
+      // Check if we have a reset token in the URL hash (Supabase redirects with hash)
       const hash = window.location.hash;
-      console.log("URL hash:", hash ? hash.substring(0, 50) + "..." : "no hash");
+      const searchParams = new URLSearchParams(window.location.search);
       
+      console.log("URL hash:", hash ? hash.substring(0, 50) + "..." : "no hash");
+      console.log("URL search:", window.location.search);
+      
+      // Check hash first (Supabase's preferred method)
       const hashParams = new URLSearchParams(hash.substring(1));
-      const accessToken = hashParams.get("access_token");
-      const type = hashParams.get("type");
+      let accessToken = hashParams.get("access_token");
+      let type = hashParams.get("type");
+      
+      // If not in hash, check query params (fallback)
+      if (!accessToken) {
+        accessToken = searchParams.get("access_token");
+        type = searchParams.get("type");
+      }
 
       console.log("Token check:", { accessToken: !!accessToken, type });
 
@@ -92,10 +102,12 @@ function ResetPasswordContent() {
         if (session) {
           setIsValidToken(true);
         } else {
+          // Show error immediately if no token found
           setMessage({
             type: "error",
             text: "Invalid or expired reset link. Please request a new password reset.",
           });
+          setIsValidToken(false);
         }
       }
     };

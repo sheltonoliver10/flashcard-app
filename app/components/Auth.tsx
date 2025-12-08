@@ -26,8 +26,9 @@ export function Auth() {
 
       if (isResetPassword) {
         // Send password reset email
+        // Use callback route to handle Supabase verify redirect properly
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/auth/reset-password`,
+          redirectTo: `${window.location.origin}/auth/callback`,
         });
 
         if (error) throw error;
