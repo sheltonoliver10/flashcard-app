@@ -26,8 +26,13 @@ export function Auth() {
 
       if (isResetPassword) {
         // Send password reset email
+        // Use localhost for development, production URL for deployed
+        const redirectUrl = window.location.hostname === 'localhost' 
+          ? `${window.location.origin}/auth/reset-password`
+          : "https://www.barexamnotecards.com/auth/reset-password";
+        
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: "https://www.barexamnotecards.com/auth/reset-password",
+          redirectTo: redirectUrl,
         });
 
         if (error) throw error;
