@@ -18,7 +18,7 @@ export default function Home() {
   const isAdmin = user?.email?.toLowerCase() === adminEmail.toLowerCase();
 
   useEffect(() => {
-    // Check for password reset token in URL hash (in case Supabase redirects to root)
+    // Check for auth tokens in URL hash (password reset or email verification)
     const hash = window.location.hash;
     if (hash) {
       const hashParams = new URLSearchParams(hash.substring(1));
@@ -28,6 +28,13 @@ export default function Home() {
       if (type === 'recovery' && accessToken) {
         // Redirect to reset password page with token
         window.location.href = `/auth/reset-password${hash}`;
+        return;
+      }
+      
+      // Handle email verification - Supabase will automatically process it
+      if (type === 'signup' && accessToken) {
+        // Let Supabase process the verification token
+        // The auth state change listener will handle the session
         return;
       }
     }
