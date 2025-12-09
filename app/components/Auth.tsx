@@ -26,11 +26,8 @@ export function Auth() {
 
       if (isResetPassword) {
         // Send password reset email
-        // Use environment variable for redirect URL, fallback to dynamic origin
-        const redirectUrl = process.env.NEXT_PUBLIC_REDIRECT_URL || `${window.location.origin}/auth/reset-password`;
-        
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: redirectUrl,
+          redirectTo: process.env.NEXT_PUBLIC_REDIRECT_URL,
         });
 
         if (error) throw error;
