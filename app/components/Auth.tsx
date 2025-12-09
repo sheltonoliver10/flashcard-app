@@ -26,11 +26,8 @@ export function Auth() {
 
       if (isResetPassword) {
         // Send password reset email
-        const redirectUrl = process.env.NEXT_PUBLIC_REDIRECT_URL;
-        
-        if (!redirectUrl) {
-          throw new Error("Password reset redirect URL is not configured. Please set NEXT_PUBLIC_REDIRECT_URL environment variable.");
-        }
+        // Use environment variable if set, otherwise fallback to current origin
+        const redirectUrl = process.env.NEXT_PUBLIC_REDIRECT_URL || `${window.location.origin}/auth/reset-password`;
         
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: redirectUrl,
