@@ -27,7 +27,7 @@ export function Auth() {
       if (isResetPassword) {
         // Send password reset email
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: process.env.NEXT_PUBLIC_REDIRECT_URL,
+          redirectTo: process.env.NEXT_PUBLIC_REDIRECT_URL || "",
         });
 
         if (error) throw error;
