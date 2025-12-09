@@ -26,18 +26,30 @@ export function Auth() {
 
       if (isResetPassword) {
         // Send password reset email
-        // Use environment variable if set, otherwise use current origin
-        // For production, ensure we use https and www
+        // Always use environment variable for redirect URL to ensure consistency
+        // This should be set to production URL in Vercel and localhost in .env.local
         let redirectUrl = process.env.NEXT_PUBLIC_REDIRECT_URL;
         
         if (!redirectUrl) {
-          // Fallback: use current origin, but fix for production domain
-          redirectUrl = window.location.origin;
-          if (redirectUrl.includes('barexamnotecards.com') && !redirectUrl.includes('www.')) {
-            redirectUrl = redirectUrl.replace('barexamnotecards.com', 'www.barexamnotecards.com');
-          }
-          redirectUrl = `${redirectUrl}/auth/reset-password`;
+          // Fallback: construct from current origin, ensure www for production
+          const origin = window.location.origin;
+          const baseUrl = origin.includes('barexamnotecards.com') && !origin.includes('www.')
+            ? origin.replace('barexamnotecards.com', 'www.barexamnotecards.com')
+            : origin;
+          redirectUrl = `${baseUrl}/auth/reset-password`;
         }
+        
+        // Ensure redirect URL is absolute and includes protocol
+        if (!redirectUrl.startsWith('http://') && !redirectUrl.startsWith('https://')) {
+          redirectUrl = `${window.location.origin}${redirectUrl.startsWith('/') ? '' : '/'}${redirectUrl}`;
+        }
+        
+        // Ensure www for production domain
+        if (redirectUrl.includes('barexamnotecards.com') && !redirectUrl.includes('www.')) {
+          redirectUrl = redirectUrl.replace('barexamnotecards.com', 'www.barexamnotecards.com');
+        }
+        
+        console.log('Password reset redirect URL:', redirectUrl);
         
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: redirectUrl,
