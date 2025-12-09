@@ -44,10 +44,9 @@ export function Auth() {
         setEmail("");
         setIsResetPassword(false);
       } else if (isSignUp) {
-        // Use environment variable for email redirect, fallback to dynamic origin
-        const emailRedirectUrl = process.env.NEXT_PUBLIC_REDIRECT_URL 
-          ? process.env.NEXT_PUBLIC_REDIRECT_URL.replace('/auth/reset-password', '/')
-          : `${window.location.origin}/`;
+        // For sign-up, always use the current origin (localhost for dev, production for prod)
+        // This ensures email verification links work correctly in both environments
+        const emailRedirectUrl = `${window.location.origin}/`;
         
         const { data, error } = await supabase.auth.signUp({
           email,
