@@ -26,8 +26,18 @@ export function Auth() {
 
       if (isResetPassword) {
         // Send password reset email
-        // Use environment variable if set, otherwise fallback to current origin
-        const redirectUrl = process.env.NEXT_PUBLIC_REDIRECT_URL || `${window.location.origin}/auth/reset-password`;
+        // Use environment variable if set, otherwise use current origin
+        // For production, ensure we use https and www
+        let redirectUrl = process.env.NEXT_PUBLIC_REDIRECT_URL;
+        
+        if (!redirectUrl) {
+          // Fallback: use current origin, but fix for production domain
+          redirectUrl = window.location.origin;
+          if (redirectUrl.includes('barexamnotecards.com') && !redirectUrl.includes('www.')) {
+            redirectUrl = redirectUrl.replace('barexamnotecards.com', 'www.barexamnotecards.com');
+          }
+          redirectUrl = `${redirectUrl}/auth/reset-password`;
+        }
         
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: redirectUrl,
