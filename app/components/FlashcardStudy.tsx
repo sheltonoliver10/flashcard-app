@@ -3,6 +3,32 @@
 import { useState, useEffect } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
 
+declare global {
+  interface Window {
+    gtag?: (...args: any[]) => void;
+  }
+}
+
+// Helper function to track events
+const trackEvent = (eventName: string, params?: Record<string, any>) => {
+  console.log('🔵 Tracking event:', eventName, params); // Debug log
+  
+  if (typeof window !== 'undefined') {
+    console.log('🔵 Window available, checking gtag...');
+    
+    if (window.gtag) {
+      console.log('✅ gtag available, sending event to GA');
+      window.gtag('event', eventName, params);
+      console.log('✅ Event sent:', eventName);
+    } else {
+      console.warn('⚠️ gtag not available. Google Analytics may not be loaded yet.');
+      console.warn('⚠️ NEXT_PUBLIC_GA_ID:', process.env.NEXT_PUBLIC_GA_ID || 'NOT SET');
+    }
+  } else {
+    console.warn('⚠️ Window not available');
+  }
+};
+
 interface Flashcard {
   id: string;
   front_text: string;
@@ -90,6 +116,14 @@ export function FlashcardStudy({ studyMode, subjectId, subtopicId, onBack }: Fla
     setSessionStarted(true);
     setIsReviewMode(false);
     setOriginalWrongCards(new Set());
+    
+    // Track study session start
+    trackEvent('study_session_start', {
+      study_mode: studyMode,
+      subject_id: subjectId || null,
+      subtopic_id: subtopicId || null,
+      card_count: sessionCards.length
+    });
   };
 
   const handleCorrect = () => {
@@ -105,6 +139,14 @@ export function FlashcardStudy({ studyMode, subjectId, subtopicId, onBack }: Fla
       return newSet;
     });
 
+    // Track correct answer
+    trackEvent('card_correct', {
+      card_id: currentCard.id,
+      card_index: currentIndex,
+      study_mode: studyMode,
+      is_review_mode: isReviewMode
+    });
+
     moveToNext();
   };
 
@@ -113,6 +155,15 @@ export function FlashcardStudy({ studyMode, subjectId, subtopicId, onBack }: Fla
     if (!currentCard) return;
 
     setWrongCards((prev) => new Set(prev).add(currentCard.id));
+    
+    // Track wrong answer
+    trackEvent('card_incorrect', {
+      card_id: currentCard.id,
+      card_index: currentIndex,
+      study_mode: studyMode,
+      is_review_mode: isReviewMode
+    });
+
     moveToNext();
   };
 
@@ -125,11 +176,33 @@ export function FlashcardStudy({ studyMode, subjectId, subtopicId, onBack }: Fla
       if (!isReviewMode) {
         setOriginalWrongCards(new Set(wrongCards));
         setSessionComplete(true);
+        
+        // Track session completion
+        trackEvent('study_session_complete', {
+          study_mode: studyMode,
+          subject_id: subjectId || null,
+          subtopic_id: subtopicId || null,
+          total_cards: flashcards.length,
+          correct_count: flashcards.length - wrongCards.size,
+          incorrect_count: wrongCards.size,
+          is_review_mode: false
+        });
       } else {
         // In review mode, always show completion screen with current session results
         // Update originalWrongCards to reflect the current wrong cards from this review session
         setOriginalWrongCards(new Set(wrongCards));
         setSessionComplete(true);
+        
+        // Track review session completion
+        trackEvent('study_session_complete', {
+          study_mode: studyMode,
+          subject_id: subjectId || null,
+          subtopic_id: subtopicId || null,
+          total_cards: sessionCards.length,
+          correct_count: sessionCards.length - wrongCards.size,
+          incorrect_count: wrongCards.size,
+          is_review_mode: true
+        });
       }
     } else {
       setCurrentIndex((prev) => prev + 1);
@@ -137,7 +210,20 @@ export function FlashcardStudy({ studyMode, subjectId, subtopicId, onBack }: Fla
   };
 
   const handleFlip = () => {
+    const wasFlipped = isFlipped;
     setIsFlipped(!isFlipped);
+    
+    // Track card flip (only when flipping to back, not when flipping back to front)
+    if (!wasFlipped) {
+      const currentCard = sessionCards[currentIndex];
+      if (currentCard) {
+        trackEvent('card_flipped', {
+          card_id: currentCard.id,
+          card_index: currentIndex,
+          study_mode: studyMode
+        });
+      }
+    }
   };
 
   const handleRestart = () => {
@@ -161,6 +247,14 @@ export function FlashcardStudy({ studyMode, subjectId, subtopicId, onBack }: Fla
     setWrongCards(new Set());
     setIsReviewMode(true);
     setSessionComplete(false);
+    
+    // Track review session start
+    trackEvent('review_session_start', {
+      study_mode: studyMode,
+      subject_id: subjectId || null,
+      subtopic_id: subtopicId || null,
+      review_card_count: missedCardsArray.length
+    });
   };
 
   if (loading) {
