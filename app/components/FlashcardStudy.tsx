@@ -9,26 +9,6 @@ declare global {
   }
 }
 
-// Helper function to track events
-const trackEvent = (eventName: string, params?: Record<string, any>) => {
-  console.log('🔵 Tracking event:', eventName, params); // Debug log
-  
-  if (typeof window !== 'undefined') {
-    console.log('🔵 Window available, checking gtag...');
-    
-    if (window.gtag) {
-      console.log('✅ gtag available, sending event to GA');
-      window.gtag('event', eventName, params);
-      console.log('✅ Event sent:', eventName);
-    } else {
-      console.warn('⚠️ gtag not available. Google Analytics may not be loaded yet.');
-      console.warn('⚠️ NEXT_PUBLIC_GA_ID:', process.env.NEXT_PUBLIC_GA_ID || 'NOT SET');
-    }
-  } else {
-    console.warn('⚠️ Window not available');
-  }
-};
-
 interface Flashcard {
   id: string;
   front_text: string;
@@ -57,6 +37,26 @@ export function FlashcardStudy({ studyMode, subjectId, subtopicId, onBack }: Fla
   const [error, setError] = useState<string | null>(null);
   const [sessionStarted, setSessionStarted] = useState(false);
   const [sessionComplete, setSessionComplete] = useState(false);
+
+  // Helper function to track events
+  const trackEvent = (eventName: string, params?: Record<string, any>) => {
+    console.log('🔵 Tracking event:', eventName, params); // Debug log
+    
+    if (typeof window !== 'undefined') {
+      console.log('🔵 Window available, checking gtag...');
+      
+      if (window.gtag) {
+        console.log('✅ gtag available, sending event to GA');
+        window.gtag('event', eventName, params);
+        console.log('✅ Event sent:', eventName);
+      } else {
+        console.warn('⚠️ gtag not available. Google Analytics may not be loaded yet.');
+        console.warn('⚠️ NEXT_PUBLIC_GA_ID:', process.env.NEXT_PUBLIC_GA_ID || 'NOT SET');
+      }
+    } else {
+      console.warn('⚠️ Window not available');
+    }
+  };
 
   // Track session complete when completion screen is shown and save to database
   useEffect(() => {
