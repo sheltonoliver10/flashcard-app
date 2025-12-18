@@ -3,6 +3,32 @@
 import { useState, useEffect } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
 
+declare global {
+  interface Window {
+    gtag?: (...args: any[]) => void;
+  }
+}
+
+// Helper function to track events
+const trackEvent = (eventName: string, params?: Record<string, any>) => {
+  console.log('🔵 Tracking event:', eventName, params); // Debug log
+  
+  if (typeof window !== 'undefined') {
+    console.log('🔵 Window available, checking gtag...');
+    
+    if (window.gtag) {
+      console.log('✅ gtag available, sending event to GA');
+      window.gtag('event', eventName, params);
+      console.log('✅ Event sent:', eventName);
+    } else {
+      console.warn('⚠️ gtag not available. Google Analytics may not be loaded yet.');
+      console.warn('⚠️ NEXT_PUBLIC_GA_ID:', process.env.NEXT_PUBLIC_GA_ID || 'NOT SET');
+    }
+  } else {
+    console.warn('⚠️ Window not available');
+  }
+};
+
 interface Flashcard {
   id: string;
   front_text: string;
