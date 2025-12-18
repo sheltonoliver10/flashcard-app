@@ -5,13 +5,23 @@ import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
 import { FlashcardModeSelector } from "./components/FlashcardModeSelector";
 import { FlashcardManagement } from "./components/FlashcardManagement";
 import { Auth } from "./components/Auth";
+import { PieChart } from "./components/PieChart";
 import type { User } from "@supabase/supabase-js";
+
+interface SubjectMastery {
+  subject_id: string;
+  subject_name: string;
+  mastery_percentage: number;
+  cards_mastered: number;
+  total_cards: number;
+}
 
 export default function Home() {
   const [mode, setMode] = useState<"study" | "manage">("study");
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [subjectMastery, setSubjectMastery] = useState<SubjectMastery[]>([]);
   
   // Check if user is admin
   const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "";
@@ -125,6 +135,88 @@ export default function Home() {
     }
   }, []);
 
+  // Fetch user's card mastery percentage for each subject
+  useEffect(() => {
+    const fetchSubjectMastery = async () => {
+      if (!user) {
+        setSubjectMastery([]);
+        return;
+      }
+
+      try {
+        const supabase = createSupabaseBrowserClient();
+        
+        // Get all subjects
+        const { data: subjects, error: subjectsError } = await supabase
+          .from('subjects')
+          .select('id, name')
+          .order('name');
+
+        if (subjectsError) throw subjectsError;
+        if (!subjects || subjects.length === 0) {
+          setSubjectMastery([]);
+          return;
+        }
+
+        // Calculate mastery for each subject
+        const masteryPromises = subjects.map(async (subject) => {
+          // Get total cards for this subject
+          const { data: allCards, error: cardsError } = await supabase
+            .from('flashcards')
+            .select('id')
+            .eq('subject_id', subject.id);
+
+          if (cardsError) throw cardsError;
+          const totalCards = allCards?.length || 0;
+
+          if (totalCards === 0) {
+            return {
+              subject_id: subject.id,
+              subject_name: subject.name,
+              mastery_percentage: 0,
+              cards_mastered: 0,
+              total_cards: 0
+            };
+          }
+
+          // Get user's mastery records for cards in this subject
+          const { data: masteryRecords, error: masteryError } = await supabase
+            .from('card_mastery')
+            .select('card_id, correct_count')
+            .eq('user_id', user.id)
+            .in('card_id', allCards.map(c => c.id));
+
+          if (masteryError) throw masteryError;
+
+          // Count cards mastered (correct_count >= 5)
+          const cardsMastered = (masteryRecords || []).filter(
+            (record: any) => record.correct_count >= 5
+          ).length;
+
+          const masteryPercentage = totalCards > 0 
+            ? (cardsMastered / totalCards) * 100 
+            : 0;
+
+          return {
+            subject_id: subject.id,
+            subject_name: subject.name,
+            mastery_percentage: masteryPercentage,
+            cards_mastered: cardsMastered,
+            total_cards: totalCards
+          };
+        });
+
+        const mastery = await Promise.all(masteryPromises);
+        setSubjectMastery(mastery);
+      } catch (error) {
+        console.error('Error fetching subject mastery:', error);
+        setSubjectMastery([]);
+      }
+    };
+
+    fetchSubjectMastery();
+  }, [user]);
+
   const handleLogout = async () => {
     console.log("Logout initiated");
     setIsLoggingOut(true); // Prevent auth state listener from restoring session
@@ -237,7 +329,39 @@ export default function Home() {
           </div>
         </div>
         {mode === "study" ? (
-          <FlashcardModeSelector />
+          <>
+            {subjectMastery.length > 0 && (
+              <div className="bg-white p-6 rounded-lg shadow-md mb-6">
+                <h2 className="text-xl font-semibold text-gray-900 mb-6">Cards Mastered by Topic</h2>
+                <div className="flex flex-wrap justify-center gap-4">
+                  {subjectMastery.map((mastery) => (
+                    <div
+                      key={mastery.subject_id}
+                      className="flex flex-col items-center p-3 border border-gray-200 rounded-md bg-gray-50"
+                      style={{ width: '110px' }}
+                    >
+                      <h3 className="text-xs font-semibold text-gray-900 mb-1 text-center">{mastery.subject_name}</h3>
+                      <div className="flex items-center justify-center h-14">
+                        <PieChart percentage={mastery.mastery_percentage} size={55} />
+                      </div>
+                      <div className={`mt-1 text-xs font-bold ${
+                        mastery.mastery_percentage >= 80
+                          ? 'text-green-600'
+                          : mastery.mastery_percentage >= 60
+                          ? 'text-yellow-600'
+                          : mastery.mastery_percentage > 0
+                          ? 'text-orange-600'
+                          : 'text-gray-500'
+                      }`}>
+                        {Math.round(mastery.mastery_percentage)}%
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <FlashcardModeSelector />
+          </>
         ) : isAdmin ? (
           <FlashcardManagement />
         ) : (

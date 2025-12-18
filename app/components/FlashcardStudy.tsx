@@ -3,32 +3,6 @@
 import { useState, useEffect } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
 
-declare global {
-  interface Window {
-    gtag?: (...args: any[]) => void;
-  }
-}
-
-// Helper function to track events
-const trackEvent = (eventName: string, params?: Record<string, any>) => {
-  console.log('🔵 Tracking event:', eventName, params); // Debug log
-  
-  if (typeof window !== 'undefined') {
-    console.log('🔵 Window available, checking gtag...');
-    
-    if (window.gtag) {
-      console.log('✅ gtag available, sending event to GA');
-      window.gtag('event', eventName, params);
-      console.log('✅ Event sent:', eventName);
-    } else {
-      console.warn('⚠️ gtag not available. Google Analytics may not be loaded yet.');
-      console.warn('⚠️ NEXT_PUBLIC_GA_ID:', process.env.NEXT_PUBLIC_GA_ID || 'NOT SET');
-    }
-  } else {
-    console.warn('⚠️ Window not available');
-  }
-};
-
 interface Flashcard {
   id: string;
   front_text: string;
@@ -58,6 +32,83 @@ export function FlashcardStudy({ studyMode, subjectId, subtopicId, onBack }: Fla
   const [sessionStarted, setSessionStarted] = useState(false);
   const [sessionComplete, setSessionComplete] = useState(false);
 
+  // Track session complete when completion screen is shown and save to database
+  useEffect(() => {
+    if (sessionComplete) {
+      const totalCardsInSession = isReviewMode ? sessionCards.length : flashcards.length;
+      const correctInSession = totalCardsInSession - originalWrongCards.size;
+      const incorrectInSession = originalWrongCards.size;
+      const percentageCorrect = totalCardsInSession > 0 
+        ? (correctInSession / totalCardsInSession) * 100 
+        : 0;
+      
+      // Track event for Google Analytics
+      trackEvent('session_complete', {
+        study_mode: studyMode,
+        subject_id: subjectId || null,
+        subtopic_id: subtopicId || null,
+        total_cards: totalCardsInSession,
+        correct_count: correctInSession,
+        incorrect_count: incorrectInSession,
+        is_review_mode: isReviewMode
+      });
+
+      // Save session result to database (only for subject/subtopic mode, not random)
+      const saveSessionResult = async () => {
+        try {
+          const supabase = createSupabaseBrowserClient();
+          
+          // Get current user
+          const { data: { user } } = await supabase.auth.getUser();
+          
+          if (!user) {
+            console.log('No user logged in, skipping session save');
+            return;
+          }
+
+          // Only save if it's subject or subtopic mode (not random)
+          if (studyMode === 'subject' && subjectId) {
+            const { error } = await supabase.from('study_sessions').insert({
+              user_id: user.id,
+              subject_id: subjectId,
+              subtopic_id: null,
+              study_mode: studyMode,
+              total_cards: totalCardsInSession,
+              correct_count: correctInSession,
+              incorrect_count: incorrectInSession,
+              percentage_correct: percentageCorrect,
+              is_review_mode: isReviewMode
+            });
+
+            if (error) {
+              console.error('Error saving study session:', error);
+            }
+          } else if (studyMode === 'subtopic' && subtopicId) {
+            const { error } = await supabase.from('study_sessions').insert({
+              user_id: user.id,
+              subject_id: subjectId || null,
+              subtopic_id: subtopicId,
+              study_mode: studyMode,
+              total_cards: totalCardsInSession,
+              correct_count: correctInSession,
+              incorrect_count: incorrectInSession,
+              percentage_correct: percentageCorrect,
+              is_review_mode: isReviewMode
+            });
+
+            if (error) {
+              console.error('Error saving study session:', error);
+            }
+          }
+        } catch (err) {
+          console.error('Error saving study session:', err);
+        }
+      };
+
+      saveSessionResult();
+    }
+  }, [sessionComplete, isReviewMode, sessionCards, flashcards, originalWrongCards, studyMode, subjectId, subtopicId]);
+
   // Fetch flashcards based on study mode
   useEffect(() => {
     const fetchFlashcards = async () => {
@@ -79,6 +130,18 @@ export function FlashcardStudy({ studyMode, subjectId, subtopicId, onBack }: Fla
         if (fetchError) throw fetchError;
 
         let cards = data || [];
+        
+        // Sort flashcards: first by display_order if it exists, otherwise by created_at
+        cards.sort((a: any, b: any) => {
+          // If display_order exists, use it
+          if (a.display_order !== undefined && b.display_order !== undefined) {
+            return a.display_order - b.display_order;
+          }
+          // Otherwise fall back to created_at
+          const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return aTime - bTime;
+        });
         
         // For random mode, shuffle and take 25
         if (studyMode === "random") {
@@ -116,14 +179,6 @@ export function FlashcardStudy({ studyMode, subjectId, subtopicId, onBack }: Fla
     setSessionStarted(true);
     setIsReviewMode(false);
     setOriginalWrongCards(new Set());
-    
-    // Track study session start
-    trackEvent('study_session_start', {
-      study_mode: studyMode,
-      subject_id: subjectId || null,
-      subtopic_id: subtopicId || null,
-      card_count: sessionCards.length
-    });
   };
 
   const handleCorrect = () => {
@@ -139,13 +194,69 @@ export function FlashcardStudy({ studyMode, subjectId, subtopicId, onBack }: Fla
       return newSet;
     });
 
-    // Track correct answer
-    trackEvent('card_correct', {
-      card_id: currentCard.id,
-      card_index: currentIndex,
-      study_mode: studyMode,
-      is_review_mode: isReviewMode
-    });
+    // Track card mastery - increment correct count
+    const updateCardMastery = async () => {
+      try {
+        const supabase = createSupabaseBrowserClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) return;
+
+        // Check if mastery record exists
+        const { data: existing, error: fetchError } = await supabase
+          .from('card_mastery')
+          .select('correct_count')
+          .eq('user_id', user.id)
+          .eq('card_id', currentCard.id)
+          .maybeSingle();
+
+        if (existing && !fetchError) {
+          // Update existing record - increment correct count
+          await supabase
+            .from('card_mastery')
+            .update({ 
+              correct_count: existing.correct_count + 1,
+              last_updated: new Date().toISOString()
+            })
+            .eq('user_id', user.id)
+            .eq('card_id', currentCard.id);
+        } else {
+          // Create new record
+          const { error: insertError } = await supabase
+            .from('card_mastery')
+            .insert({
+              user_id: user.id,
+              card_id: currentCard.id,
+              correct_count: 1
+            });
+          
+          // If insert fails due to duplicate (race condition), try update instead
+          if (insertError && insertError.code === '23505') {
+            const { data: retry } = await supabase
+              .from('card_mastery')
+              .select('correct_count')
+              .eq('user_id', user.id)
+              .eq('card_id', currentCard.id)
+              .maybeSingle();
+            
+            if (retry) {
+              await supabase
+                .from('card_mastery')
+                .update({ 
+                  correct_count: retry.correct_count + 1,
+                  last_updated: new Date().toISOString()
+                })
+                .eq('user_id', user.id)
+                .eq('card_id', currentCard.id);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error updating card mastery:', error);
+      }
+    };
+
+    updateCardMastery();
 
     moveToNext();
   };
@@ -155,15 +266,6 @@ export function FlashcardStudy({ studyMode, subjectId, subtopicId, onBack }: Fla
     if (!currentCard) return;
 
     setWrongCards((prev) => new Set(prev).add(currentCard.id));
-    
-    // Track wrong answer
-    trackEvent('card_incorrect', {
-      card_id: currentCard.id,
-      card_index: currentIndex,
-      study_mode: studyMode,
-      is_review_mode: isReviewMode
-    });
-
     moveToNext();
   };
 
@@ -176,33 +278,11 @@ export function FlashcardStudy({ studyMode, subjectId, subtopicId, onBack }: Fla
       if (!isReviewMode) {
         setOriginalWrongCards(new Set(wrongCards));
         setSessionComplete(true);
-        
-        // Track session completion
-        trackEvent('study_session_complete', {
-          study_mode: studyMode,
-          subject_id: subjectId || null,
-          subtopic_id: subtopicId || null,
-          total_cards: flashcards.length,
-          correct_count: flashcards.length - wrongCards.size,
-          incorrect_count: wrongCards.size,
-          is_review_mode: false
-        });
       } else {
         // In review mode, always show completion screen with current session results
         // Update originalWrongCards to reflect the current wrong cards from this review session
         setOriginalWrongCards(new Set(wrongCards));
         setSessionComplete(true);
-        
-        // Track review session completion
-        trackEvent('study_session_complete', {
-          study_mode: studyMode,
-          subject_id: subjectId || null,
-          subtopic_id: subtopicId || null,
-          total_cards: sessionCards.length,
-          correct_count: sessionCards.length - wrongCards.size,
-          incorrect_count: wrongCards.size,
-          is_review_mode: true
-        });
       }
     } else {
       setCurrentIndex((prev) => prev + 1);
@@ -210,20 +290,7 @@ export function FlashcardStudy({ studyMode, subjectId, subtopicId, onBack }: Fla
   };
 
   const handleFlip = () => {
-    const wasFlipped = isFlipped;
     setIsFlipped(!isFlipped);
-    
-    // Track card flip (only when flipping to back, not when flipping back to front)
-    if (!wasFlipped) {
-      const currentCard = sessionCards[currentIndex];
-      if (currentCard) {
-        trackEvent('card_flipped', {
-          card_id: currentCard.id,
-          card_index: currentIndex,
-          study_mode: studyMode
-        });
-      }
-    }
   };
 
   const handleRestart = () => {
@@ -247,14 +314,6 @@ export function FlashcardStudy({ studyMode, subjectId, subtopicId, onBack }: Fla
     setWrongCards(new Set());
     setIsReviewMode(true);
     setSessionComplete(false);
-    
-    // Track review session start
-    trackEvent('review_session_start', {
-      study_mode: studyMode,
-      subject_id: subjectId || null,
-      subtopic_id: subtopicId || null,
-      review_card_count: missedCardsArray.length
-    });
   };
 
   if (loading) {
@@ -333,7 +392,6 @@ export function FlashcardStudy({ studyMode, subjectId, subtopicId, onBack }: Fla
   if (sessionComplete) {
     // Calculate score based on current session
     // When in review mode, sessionCards contains the cards from the review session
-    // When not in review mode, we need to use the original flashcards length
     const totalCardsInSession = isReviewMode ? sessionCards.length : flashcards.length;
     const correctInSession = totalCardsInSession - originalWrongCards.size;
     const perfectScore = originalWrongCards.size === 0;

@@ -31,25 +31,14 @@ export function Auth() {
         let redirectUrl = process.env.NEXT_PUBLIC_REDIRECT_URL;
         
         if (!redirectUrl) {
-          // Fallback: construct from current origin, ensure www for production
-          const origin = window.location.origin;
-          const baseUrl = origin.includes('barexamnotecards.com') && !origin.includes('www.')
-            ? origin.replace('barexamnotecards.com', 'www.barexamnotecards.com')
-            : origin;
-          redirectUrl = `${baseUrl}/auth/reset-password`;
+          // Fallback: construct from current origin
+          redirectUrl = `${window.location.origin}/auth/reset-password`;
         }
         
         // Ensure redirect URL is absolute and includes protocol
         if (!redirectUrl.startsWith('http://') && !redirectUrl.startsWith('https://')) {
           redirectUrl = `${window.location.origin}${redirectUrl.startsWith('/') ? '' : '/'}${redirectUrl}`;
         }
-        
-        // Ensure www for production domain
-        if (redirectUrl.includes('barexamnotecards.com') && !redirectUrl.includes('www.')) {
-          redirectUrl = redirectUrl.replace('barexamnotecards.com', 'www.barexamnotecards.com');
-        }
-        
-        console.log('Password reset redirect URL:', redirectUrl);
         
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: redirectUrl,
