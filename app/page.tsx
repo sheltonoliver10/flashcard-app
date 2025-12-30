@@ -7,6 +7,7 @@ import { FlashcardManagement } from "./components/FlashcardManagement";
 import { Auth } from "./components/Auth";
 import { PieChart } from "./components/PieChart";
 import type { User } from "@supabase/supabase-js";
+import { useRouter } from "next/navigation";
 
 interface SubjectMastery {
   subject_id: string;
@@ -17,11 +18,13 @@ interface SubjectMastery {
 }
 
 export default function Home() {
+  const router = useRouter();
   const [mode, setMode] = useState<"study" | "manage">("study");
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [subjectMastery, setSubjectMastery] = useState<SubjectMastery[]>([]);
+  const [isStudyActive, setIsStudyActive] = useState(false);
   
   // Check if user is admin
   const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "";
@@ -321,6 +324,12 @@ export default function Home() {
               </>
             )}
             <button
+              onClick={() => router.push("/essay-grading")}
+              className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 font-medium"
+            >
+              Essay Grading
+            </button>
+            <button
               onClick={handleLogout}
               className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 font-medium"
             >
@@ -330,7 +339,7 @@ export default function Home() {
         </div>
         {mode === "study" ? (
           <>
-            {subjectMastery.length > 0 && (
+            {!isStudyActive && subjectMastery.length > 0 && (
               <div className="bg-white p-6 rounded-lg shadow-md mb-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-6">Cards Mastered by Topic</h2>
                 <div className="flex flex-wrap justify-center gap-4">
@@ -360,7 +369,7 @@ export default function Home() {
                 </div>
               </div>
             )}
-            <FlashcardModeSelector />
+            <FlashcardModeSelector onStudyStart={() => setIsStudyActive(true)} onStudyEnd={() => setIsStudyActive(false)} />
           </>
         ) : isAdmin ? (
           <FlashcardManagement />

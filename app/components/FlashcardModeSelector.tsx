@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
 import { FlashcardStudy } from "./FlashcardStudy";
 
@@ -15,13 +15,19 @@ interface Subtopic {
   subject_id: string;
 }
 
-export function FlashcardModeSelector() {
+interface FlashcardModeSelectorProps {
+  onStudyStart?: () => void;
+  onStudyEnd?: () => void;
+}
+
+export function FlashcardModeSelector({ onStudyStart, onStudyEnd }: FlashcardModeSelectorProps) {
   const [selectedMode, setSelectedMode] = useState<"subject" | "subtopic" | "random" | null>(null);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [subtopics, setSubtopics] = useState<Subtopic[]>([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>("");
   const [selectedSubtopicId, setSelectedSubtopicId] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const wasStudyActiveRef = useRef(false);
 
   useEffect(() => {
     const fetchSubjects = async () => {
@@ -84,21 +90,28 @@ export function FlashcardModeSelector() {
     setSelectedSubtopicId("");
   };
 
-  // Show "Coming soon" for random mode
-  if (selectedMode === "random") {
+  // Notify parent when study starts or ends
+  useEffect(() => {
+    const isActive = canStartStudy();
+    if (isActive && !wasStudyActiveRef.current) {
+      // Transitioning from inactive to active
+      onStudyStart?.();
+      wasStudyActiveRef.current = true;
+    } else if (!isActive && wasStudyActiveRef.current) {
+      // Transitioning from active to inactive
+      onStudyEnd?.();
+      wasStudyActiveRef.current = false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMode, selectedSubjectId, selectedSubtopicId]);
+
+  // Show study component for random mode
+  if (selectedMode === "random" && canStartStudy()) {
     return (
-      <div className="bg-white p-8 rounded-lg shadow-md text-center min-h-[400px] flex items-center justify-center">
-        <div>
-          <button
-            onClick={handleBackToHome}
-            className="mb-6 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 font-medium flex items-center gap-2 mx-auto"
-          >
-            <span>←</span>
-            <span>Return to Home</span>
-          </button>
-          <h2 className="text-3xl font-semibold text-gray-700">Coming soon...</h2>
-        </div>
-      </div>
+      <FlashcardStudy
+        studyMode="random"
+        onBack={handleBackToHome}
+      />
     );
   }
 
