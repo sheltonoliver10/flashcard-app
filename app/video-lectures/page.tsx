@@ -4,7 +4,7 @@ import Link from "next/link";
 
 export default function VideoLecturesPage() {
   // YouTube video ID
-  const youtubeVideoId = "jB3w3a0aBnM";
+  const youtubeVideoId: string = "jB3w3a0aBnM";
 
   return (
     <main className="min-h-screen p-8 bg-gray-50">
@@ -22,7 +22,7 @@ export default function VideoLecturesPage() {
 
         {/* Video Embed */}
         <div className="bg-white p-6 rounded-lg shadow-md">
-          {youtubeVideoId === "YOUR_VIDEO_ID_HERE" ? (
+          {!youtubeVideoId || youtubeVideoId.trim() === "" ? (
             <div className="text-center py-12">
               <p className="text-xl text-gray-700 mb-4">Please add your YouTube video ID</p>
               <p className="text-gray-600 text-sm">
