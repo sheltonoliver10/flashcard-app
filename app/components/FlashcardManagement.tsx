@@ -43,6 +43,20 @@ interface Flashcard {
   created_at?: string;
 }
 
+interface Essay {
+  id: string;
+  user_id: string;
+  image_url: string | null;
+  essay_text: string;
+  feedback: string | null;
+  score: number | null;
+  max_score: number | null;
+  status: 'pending' | 'reviewed' | 'graded';
+  created_at: string;
+  updated_at: string;
+  reviewed_at: string | null;
+}
+
 // Sortable Flashcard Item Component
 function SortableFlashcardItem({
   flashcard,
@@ -252,11 +266,16 @@ export function FlashcardManagement() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [subtopics, setSubtopics] = useState<Subtopic[]>([]);
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
+  const [essays, setEssays] = useState<Essay[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"subjects" | "subtopics" | "flashcards" | "users">("subjects");
+  const [activeTab, setActiveTab] = useState<"subjects" | "subtopics" | "flashcards" | "users" | "essays">("subjects");
   const [expandedSubtopics, setExpandedSubtopics] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [editingEssay, setEditingEssay] = useState<Essay | null>(null);
+  const [essayFeedback, setEssayFeedback] = useState("");
+  const [essayScore, setEssayScore] = useState<number | null>(null);
+  const [essayMaxScore, setEssayMaxScore] = useState<number | null>(null);
   
   // Drag and drop sensors
   const sensors = useSensors(
@@ -284,7 +303,10 @@ export function FlashcardManagement() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+    if (activeTab === "essays") {
+      fetchEssays();
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (subtopicForm.subject_id) {
@@ -381,6 +403,106 @@ export function FlashcardManagement() {
     } catch (err) {
       console.error("Error fetching subtopics:", err);
       return [];
+    }
+  };
+
+  const fetchEssays = async () => {
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const { data, error } = await supabase
+        .from("essays")
+        .select("*")
+        .order("created_at", { ascending: false });
+      
+      if (error) throw error;
+      setEssays(data || []);
+    } catch (err) {
+      console.error("Error fetching essays:", err);
+      setFetchError("Failed to load essays");
+    }
+  };
+
+  const downloadEssayAsWord = (essay: Essay) => {
+    // Create Word document content
+    const scoreSection = essay.score !== null && essay.max_score !== null 
+      ? `<h2>Score: ${essay.score} out of ${essay.max_score}</h2>` 
+      : '';
+    
+    const htmlContent = `
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Essay Submission</title>
+        </head>
+        <body>
+          <h1>Essay Submission</h1>
+          <p><strong>Submitted:</strong> ${new Date(essay.created_at).toLocaleString()}</p>
+          <p><strong>Status:</strong> ${essay.status.charAt(0).toUpperCase() + essay.status.slice(1)}</p>
+          ${scoreSection}
+          ${essay.image_url ? `<p><strong>Image/PDF:</strong> ${essay.image_url}</p>` : ''}
+          <h2>Essay Text:</h2>
+          <div style="white-space: pre-wrap;">${essay.essay_text}</div>
+          ${essay.feedback ? `<h2>Feedback:</h2><div style="white-space: pre-wrap;">${essay.feedback}</div>` : ''}
+        </body>
+      </html>
+    `;
+
+    // Create blob and download
+    const blob = new Blob(['\ufeff', htmlContent], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `essay-${essay.id}.doc`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleSaveFeedback = async (essayId: string) => {
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const updateData: any = {
+        feedback: essayFeedback,
+        status: 'graded',
+        reviewed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      // Add score fields if provided
+      if (essayScore !== null && essayScore !== undefined) {
+        updateData.score = essayScore;
+      }
+      if (essayMaxScore !== null && essayMaxScore !== undefined) {
+        updateData.max_score = essayMaxScore;
+      }
+
+      const { error } = await supabase
+        .from("essays")
+        .update(updateData)
+        .eq("id", essayId);
+      
+      if (error) {
+        console.error("Supabase error:", error);
+        throw error;
+      }
+      
+      setEditingEssay(null);
+      setEssayFeedback("");
+      setEssayScore(null);
+      setEssayMaxScore(null);
+      fetchEssays();
+      alert("Feedback and score saved successfully!");
+    } catch (err: any) {
+      console.error("Error saving feedback:", err);
+      const errorMessage = err?.message || "Failed to save feedback. Please try again.";
+      
+      // Check if it's a column error
+      if (errorMessage.includes("column") && errorMessage.includes("does not exist")) {
+        alert(`Database error: ${errorMessage}\n\nPlease run this SQL in Supabase:\n\nALTER TABLE essays ADD COLUMN IF NOT EXISTS score integer, ADD COLUMN IF NOT EXISTS max_score integer;`);
+      } else {
+        alert(`Failed to save feedback: ${errorMessage}`);
+      }
     }
   };
 
@@ -1041,6 +1163,16 @@ export function FlashcardManagement() {
         >
           Users
         </button>
+        <button
+          onClick={() => setActiveTab("essays")}
+          className={`px-4 py-2 font-medium ${
+            activeTab === "essays"
+              ? "border-b-2 border-blue-600 text-blue-600"
+              : "text-gray-600 hover:text-gray-800"
+          }`}
+        >
+          Essays
+        </button>
       </div>
 
       {/* Subjects Tab */}
@@ -1546,6 +1678,169 @@ export function FlashcardManagement() {
       {activeTab === "users" && (
         <div>
           <UserList />
+        </div>
+      )}
+
+      {/* Essays Tab */}
+      {activeTab === "essays" && (
+        <div>
+          <h3 className="text-xl font-semibold mb-4">Essay Submissions</h3>
+          
+          {loading ? (
+            <p className="text-gray-600">Loading essays...</p>
+          ) : essays.length === 0 ? (
+            <p className="text-gray-600">No essays submitted yet.</p>
+          ) : (
+            <div className="space-y-4">
+              {essays.map((essay) => (
+                <div key={essay.id} className="border border-gray-200 rounded-lg p-6 bg-white">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <div className="text-sm text-gray-500 mb-1">
+                        Submitted: {new Date(essay.created_at).toLocaleString()}
+                      </div>
+                      <div className={`inline-block px-2 py-1 rounded text-xs font-medium ${
+                        essay.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                        essay.status === 'reviewed' ? 'bg-blue-100 text-blue-800' :
+                        'bg-green-100 text-green-800'
+                      }`}>
+                        {essay.status.charAt(0).toUpperCase() + essay.status.slice(1)}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => downloadEssayAsWord(essay)}
+                        className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
+                      >
+                        Download Word Doc
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingEssay(essay);
+                          setEssayFeedback(essay.feedback || "");
+                          setEssayScore(essay.score || null);
+                          setEssayMaxScore(essay.max_score || null);
+                        }}
+                        className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm"
+                      >
+                        {essay.feedback ? "Edit Feedback" : "Add Feedback"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {essay.image_url && (
+                    <div className="mb-4">
+                      <img
+                        src={essay.image_url}
+                        alt="Essay image"
+                        className="max-w-full h-auto rounded border border-gray-300"
+                      />
+                    </div>
+                  )}
+
+                  <div className="mb-4">
+                    <div className="text-sm font-medium text-gray-700 mb-2">Essay Text:</div>
+                    <div className="p-3 bg-gray-50 rounded whitespace-pre-wrap break-words border border-gray-200">
+                      {essay.essay_text}
+                    </div>
+                  </div>
+
+                  {essay.score !== null && essay.max_score !== null && (
+                    <div className="mb-4">
+                      <div className="text-sm font-medium text-gray-700 mb-2">Score:</div>
+                      <div className="p-3 bg-green-50 rounded border border-green-200">
+                        <span className="text-2xl font-bold text-green-700">
+                          {essay.score} out of {essay.max_score}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {essay.feedback && (
+                    <div className="mb-4">
+                      <div className="text-sm font-medium text-gray-700 mb-2">Feedback:</div>
+                      <div className="p-3 bg-blue-50 rounded whitespace-pre-wrap break-words border border-blue-200">
+                        {essay.feedback}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Feedback Modal */}
+          {editingEssay && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+                <h3 className="text-xl font-semibold mb-4">Add Feedback and Score</h3>
+                
+                {/* Score Inputs */}
+                <div className="mb-4 grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Score
+                    </label>
+                    <input
+                      type="number"
+                      value={essayScore ?? ''}
+                      onChange={(e) => setEssayScore(e.target.value ? parseInt(e.target.value) : null)}
+                      placeholder="e.g., 85"
+                      min="0"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Max Score
+                    </label>
+                    <input
+                      type="number"
+                      value={essayMaxScore ?? ''}
+                      onChange={(e) => setEssayMaxScore(e.target.value ? parseInt(e.target.value) : null)}
+                      placeholder="e.g., 100"
+                      min="1"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                    />
+                  </div>
+                </div>
+
+                {/* Feedback Textarea */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Feedback
+                  </label>
+                  <textarea
+                    value={essayFeedback}
+                    onChange={(e) => setEssayFeedback(e.target.value)}
+                    rows={10}
+                    placeholder="Enter your feedback here..."
+                    className="w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder-gray-400 resize-y"
+                  />
+                </div>
+
+                <div className="flex gap-2 justify-end">
+                  <button
+                    onClick={() => {
+                      setEditingEssay(null);
+                      setEssayFeedback("");
+                      setEssayScore(null);
+                      setEssayMaxScore(null);
+                    }}
+                    className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleSaveFeedback(editingEssay.id)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  >
+                    Save Feedback & Score
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
