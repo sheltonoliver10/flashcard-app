@@ -2,29 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
-import { FlashcardModeSelector } from "./components/FlashcardModeSelector";
-import { FlashcardManagement } from "./components/FlashcardManagement";
 import { Auth } from "./components/Auth";
-import { PieChart } from "./components/PieChart";
 import type { User } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 
-interface SubjectMastery {
-  subject_id: string;
-  subject_name: string;
-  mastery_percentage: number;
-  cards_mastered: number;
-  total_cards: number;
-}
-
 export default function Home() {
   const router = useRouter();
-  const [mode, setMode] = useState<"study" | "manage">("study");
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [subjectMastery, setSubjectMastery] = useState<SubjectMastery[]>([]);
-  const [isStudyActive, setIsStudyActive] = useState(false);
   
   // Check if user is admin
   const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "";
@@ -138,88 +124,6 @@ export default function Home() {
     }
   }, []);
 
-  // Fetch user's card mastery percentage for each subject
-  useEffect(() => {
-    const fetchSubjectMastery = async () => {
-      if (!user) {
-        setSubjectMastery([]);
-        return;
-      }
-
-      try {
-        const supabase = createSupabaseBrowserClient();
-        
-        // Get all subjects
-        const { data: subjects, error: subjectsError } = await supabase
-          .from('subjects')
-          .select('id, name')
-          .order('name');
-
-        if (subjectsError) throw subjectsError;
-        if (!subjects || subjects.length === 0) {
-          setSubjectMastery([]);
-          return;
-        }
-
-        // Calculate mastery for each subject
-        const masteryPromises = subjects.map(async (subject) => {
-          // Get total cards for this subject
-          const { data: allCards, error: cardsError } = await supabase
-            .from('flashcards')
-            .select('id')
-            .eq('subject_id', subject.id);
-
-          if (cardsError) throw cardsError;
-          const totalCards = allCards?.length || 0;
-
-          if (totalCards === 0) {
-            return {
-              subject_id: subject.id,
-              subject_name: subject.name,
-              mastery_percentage: 0,
-              cards_mastered: 0,
-              total_cards: 0
-            };
-          }
-
-          // Get user's mastery records for cards in this subject
-          const { data: masteryRecords, error: masteryError } = await supabase
-            .from('card_mastery')
-            .select('card_id, correct_count')
-            .eq('user_id', user.id)
-            .in('card_id', allCards.map(c => c.id));
-
-          if (masteryError) throw masteryError;
-
-          // Count cards mastered (correct_count >= 5)
-          const cardsMastered = (masteryRecords || []).filter(
-            (record: any) => record.correct_count >= 5
-          ).length;
-
-          const masteryPercentage = totalCards > 0 
-            ? (cardsMastered / totalCards) * 100 
-            : 0;
-
-          return {
-            subject_id: subject.id,
-            subject_name: subject.name,
-            mastery_percentage: masteryPercentage,
-            cards_mastered: cardsMastered,
-            total_cards: totalCards
-          };
-        });
-
-        const mastery = await Promise.all(masteryPromises);
-        setSubjectMastery(mastery);
-      } catch (error) {
-        console.error('Error fetching subject mastery:', error);
-        setSubjectMastery([]);
-      }
-    };
-
-    fetchSubjectMastery();
-  }, [user]);
-
   const handleLogout = async () => {
     console.log("Logout initiated");
     setIsLoggingOut(true); // Prevent auth state listener from restoring session
@@ -289,46 +193,23 @@ export default function Home() {
   return (
     <main className="min-h-screen p-8 bg-gray-50">
       <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-12">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              {mode === "study" ? "Bar Exam Notecards Study" : "Flashcard Management"}
-            </h1>
+            <h1 className="text-4xl font-bold text-gray-900">Bar Exam Study</h1>
             {isAdmin && (
               <p className="text-sm text-gray-600 mt-1">Signed in as {user.email}</p>
             )}
           </div>
           <div className="flex gap-2 items-center">
             {isAdmin && (
-              <>
-                <button
-                  onClick={() => setMode("study")}
-                  className={`px-4 py-2 rounded-md font-medium ${
-                    mode === "study"
-                      ? "bg-blue-600 text-white"
-                      : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
-                  }`}
-                >
-                  Study Mode
-                </button>
-                <button
-                  onClick={() => setMode("manage")}
-                  className={`px-4 py-2 rounded-md font-medium ${
-                    mode === "manage"
-                      ? "bg-blue-600 text-white"
-                      : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
-                  }`}
-                >
-                  Management Mode
-                </button>
-              </>
+              <button
+                onClick={() => router.push("/study?mode=manage")}
+                className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 font-medium"
+              >
+                Management
+              </button>
             )}
-            <button
-              onClick={() => router.push("/essay-grading")}
-              className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 font-medium"
-            >
-              Essay Grading
-            </button>
             <button
               onClick={handleLogout}
               className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 font-medium"
@@ -337,54 +218,69 @@ export default function Home() {
             </button>
           </div>
         </div>
-        {mode === "study" ? (
-          <>
-            {!isStudyActive && subjectMastery.length > 0 && (
-              <div className="bg-white p-6 rounded-lg shadow-md mb-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-6">Cards Mastered by Topic</h2>
-                <div className="flex flex-wrap justify-center gap-4">
-                  {subjectMastery.map((mastery) => (
-                    <div
-                      key={mastery.subject_id}
-                      className="flex flex-col items-center p-3 border border-gray-200 rounded-md bg-gray-50"
-                      style={{ width: '110px' }}
-                    >
-                      <h3 className="text-xs font-semibold text-gray-900 mb-1 text-center">{mastery.subject_name}</h3>
-                      <div className="flex items-center justify-center h-14">
-                        <PieChart percentage={mastery.mastery_percentage} size={55} />
-                      </div>
-                      <div className={`mt-1 text-xs font-bold ${
-                        mastery.mastery_percentage >= 80
-                          ? 'text-green-600'
-                          : mastery.mastery_percentage >= 60
-                          ? 'text-yellow-600'
-                          : mastery.mastery_percentage > 0
-                          ? 'text-orange-600'
-                          : 'text-gray-500'
-                      }`}>
-                        {Math.round(mastery.mastery_percentage)}%
-                      </div>
-                    </div>
-                  ))}
-                </div>
+
+        {/* Main Options */}
+        <div className="space-y-6">
+          {/* Study Notecards - Top */}
+          <button
+            onClick={() => router.push("/study")}
+            className="w-full bg-white p-8 rounded-lg shadow-md hover:shadow-lg transition-shadow border-2 border-transparent hover:border-blue-500 text-left group"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2 group-hover:text-blue-600">
+                  Study Notecards
+                </h2>
+                <p className="text-gray-600">
+                  Practice with flashcards by subject, subtopic, or random mix
+                </p>
               </div>
-            )}
-            <FlashcardModeSelector onStudyStart={() => setIsStudyActive(true)} onStudyEnd={() => setIsStudyActive(false)} />
-          </>
-        ) : isAdmin ? (
-          <FlashcardManagement />
-        ) : (
-          <div className="bg-white p-8 rounded-lg shadow-md text-center">
-            <p className="text-red-600 mb-4">Access Denied</p>
-            <p className="text-gray-600 mb-4">You don't have permission to access Management Mode.</p>
-            <button
-              onClick={() => setMode("study")}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              Go to Study Mode
-            </button>
-          </div>
-        )}
+              <div className="text-4xl group-hover:scale-110 transition-transform">
+                📚
+              </div>
+            </div>
+          </button>
+
+          {/* Watch Video Lectures - Middle */}
+          <button
+            onClick={() => router.push("/video-lectures")}
+            className="w-full bg-white p-8 rounded-lg shadow-md hover:shadow-lg transition-shadow border-2 border-transparent hover:border-purple-500 text-left group"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2 group-hover:text-purple-600">
+                  Watch Video Lectures
+                </h2>
+                <p className="text-gray-600">
+                  Access video lectures and study materials
+                </p>
+              </div>
+              <div className="text-4xl group-hover:scale-110 transition-transform">
+                🎥
+              </div>
+            </div>
+          </button>
+
+          {/* Essay Grading - Bottom */}
+          <button
+            onClick={() => router.push("/essay-grading")}
+            className="w-full bg-white p-8 rounded-lg shadow-md hover:shadow-lg transition-shadow border-2 border-transparent hover:border-green-500 text-left group"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2 group-hover:text-green-600">
+                  Essay Grading
+                </h2>
+                <p className="text-gray-600">
+                  Submit essays for grading and feedback
+                </p>
+              </div>
+              <div className="text-4xl group-hover:scale-110 transition-transform">
+                ✍️
+              </div>
+            </div>
+          </button>
+        </div>
       </div>
     </main>
   );
